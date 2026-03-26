@@ -17,9 +17,9 @@ cd server && bun install && bun run index.js
 ```
 
 ```bash
-# 构建静态站点（Docker 构建时使用）
-npx mintlify build
-# 输出目录：.mintlify/output/
+# 导出静态站点（Docker 构建时使用）
+npx mintlify export --output export.zip
+# 输出为 zip 文件，需解压后使用
 
 # Docker 构建与运行
 docker build -t mindvault .

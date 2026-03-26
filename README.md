@@ -49,6 +49,17 @@ docker run -p 3000:3000 --env-file .env mindvault
    ```
 3. 在 `mint.json` 的 `navigation` 中注册新页面路径
 
+## OIDC 客户端配置
+
+在 OIDC 提供商（如 accounts.appforges.com）注册 OAuth Client 时，需要填写回调地址（Redirect URI）：
+
+| 环境 | 回调地址 |
+|------|----------|
+| 生产环境 | `https://mint.appforges.com/auth/callback` |
+| 本地开发 | `http://localhost:3000/auth/callback` |
+
+> 可同时添加多个回调地址，以便在不同环境下使用同一个 Client。
+
 ## 环境变量
 
 | 变量 | 说明 | 必填 |
