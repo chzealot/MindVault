@@ -8,6 +8,11 @@ import * as client from "openid-client";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+console.log("[BOOT] MindVault server starting...");
+console.log("[BOOT] Node version:", process.version);
+console.log("[BOOT] Working directory:", process.cwd());
+console.log("[BOOT] __dirname:", __dirname);
+
 // ---------------------------------------------------------------------------
 // Configuration (runtime, from .env or environment variables)
 // ---------------------------------------------------------------------------
@@ -20,6 +25,15 @@ const CLIENT_ID = process.env.OIDC_CLIENT_ID;
 const CLIENT_SECRET = process.env.OIDC_CLIENT_SECRET;
 const SESSION_SECRET = process.env.SESSION_SECRET || "mindvault-secret-change-me";
 const STATIC_DIR = process.env.STATIC_DIR || path.join(__dirname, "../.mintlify/output");
+
+console.log("[CONFIG] PORT:", PORT);
+console.log("[CONFIG] BASE_URL:", BASE_URL);
+console.log("[CONFIG] OIDC_DISCOVERY_URL:", OIDC_DISCOVERY_URL);
+console.log("[CONFIG] CLIENT_ID:", CLIENT_ID ? `${CLIENT_ID.slice(0, 6)}...` : "(NOT SET)");
+console.log("[CONFIG] CLIENT_SECRET:", CLIENT_SECRET ? "(set)" : "(NOT SET)");
+console.log("[CONFIG] SESSION_SECRET:", SESSION_SECRET === "mindvault-secret-change-me" ? "(default)" : "(custom)");
+console.log("[CONFIG] STATIC_DIR:", STATIC_DIR);
+console.log("[CONFIG] ALLOWED_USERS env:", process.env.ALLOWED_USERS || "(NOT SET)");
 
 // Whitelist: comma-separated phone numbers and/or emails
 const ALLOWED_USERS = (process.env.ALLOWED_USERS || "")
@@ -40,14 +54,21 @@ if (ALLOWED_USERS.length === 0) {
   configErrors.push("ALLOWED_USERS must contain at least one email or phone.");
 }
 
-if (!fs.existsSync(STATIC_DIR)) {
+if (fs.existsSync(STATIC_DIR)) {
+  const files = fs.readdirSync(STATIC_DIR);
+  console.log(`[CONFIG] STATIC_DIR exists, contains ${files.length} items:`, files.slice(0, 20).join(", "), files.length > 20 ? "..." : "");
+} else {
   configErrors.push(`Static directory not found: ${STATIC_DIR}. Run 'npx mintlify export' first, or set STATIC_DIR to the correct path.`);
+  console.error(`[CONFIG] STATIC_DIR does NOT exist: ${STATIC_DIR}`);
 }
 
 if (configErrors.length > 0) {
+  console.error(`[CONFIG] ${configErrors.length} config error(s) found — server will run in degraded mode (503 for all non-health routes)`);
   for (const err of configErrors) {
-    console.error(`CONFIG ERROR: ${err}`);
+    console.error(`[CONFIG ERROR] ${err}`);
   }
+} else {
+  console.log("[CONFIG] All checks passed.");
 }
 
 // ---------------------------------------------------------------------------
@@ -89,9 +110,12 @@ app.use(
 // Health check (unauthenticated, always responds even with config errors)
 // ---------------------------------------------------------------------------
 app.get("/healthz", (_req, res) => {
+  console.log("[HEALTHZ] Health check requested");
   if (configErrors.length > 0) {
+    console.log("[HEALTHZ] Responding: degraded");
     return res.send(`degraded: ${configErrors.join("; ")}`);
   }
+  console.log("[HEALTHZ] Responding: ok");
   res.send("ok");
 });
 
@@ -99,7 +123,8 @@ app.get("/healthz", (_req, res) => {
 // Config guard: block all non-health routes if config is invalid
 // ---------------------------------------------------------------------------
 if (configErrors.length > 0) {
-  app.use((_req, res) => {
+  app.use((req, res) => {
+    console.log(`[503] Blocked request due to config errors: ${req.method} ${req.originalUrl}`);
     res.status(503).send(`
       <html>
         <body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:system-ui;">
@@ -278,10 +303,11 @@ app.use((_req, res) => {
 // Start
 // ---------------------------------------------------------------------------
 const server = app.listen(PORT, () => {
-  console.log(`MindVault server running on port ${PORT}`);
-  console.log(`OIDC discovery: ${OIDC_DISCOVERY_URL}`);
-  console.log(`Allowed users: ${ALLOWED_USERS.join(", ")}`);
-  console.log(`Static dir: ${STATIC_DIR}`);
+  console.log(`[BOOT] MindVault server listening on port ${PORT}`);
+  console.log(`[BOOT] Config errors: ${configErrors.length}`);
+  console.log(`[BOOT] ALLOWED_USERS count: ${ALLOWED_USERS.length} -> [${ALLOWED_USERS.join(", ")}]`);
+  console.log(`[BOOT] Static dir: ${STATIC_DIR}`);
+  console.log(`[BOOT] Server ready.`);
 });
 
 server.on("error", (err) => {
