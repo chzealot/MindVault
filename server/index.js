@@ -430,12 +430,21 @@ function resolveHtmlFile(reqPath) {
 // ---------------------------------------------------------------------------
 // Serve static Mintlify site (with user menu injection for HTML)
 // ---------------------------------------------------------------------------
+// Check if request is a browser page navigation (not XHR/fetch/asset)
+function isPageNavigation(req) {
+  const accept = req.headers.accept || "";
+  return accept.includes("text/html");
+}
+
 // Serve HTML pages with user menu injection (handles /foo -> /foo.html)
 app.use((req, res, next) => {
-  // Skip non-GET or requests with file extensions that aren't .html
   if (req.method !== "GET") return next();
+  // Skip requests for static assets (_next, images, etc.)
+  if (req.path.startsWith("/_next/")) return next();
   const ext = path.extname(req.path);
   if (ext && ext !== ".html") return next();
+  // Only inject menu for browser page navigations, not XHR/fetch
+  if (!isPageNavigation(req)) return next();
 
   const htmlFile = resolveHtmlFile(req.path);
   if (htmlFile) {
@@ -452,11 +461,15 @@ const indexPath = path.join(STATIC_DIR, "index.html");
 const indexHtml = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, "utf-8") : null;
 const indexHtmlWithMenu = indexHtml ? injectUserMenu(indexHtml) : null;
 
-app.use((_req, res) => {
+app.use((req, res) => {
   if (!indexHtmlWithMenu) {
     return res.status(404).send("index.html not found");
   }
-  res.type("html").send(indexHtmlWithMenu);
+  // Only serve SPA fallback for page navigations
+  if (isPageNavigation(req)) {
+    return res.type("html").send(indexHtmlWithMenu);
+  }
+  res.status(404).json({ error: "not found" });
 });
 
 // ---------------------------------------------------------------------------
