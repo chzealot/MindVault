@@ -8,13 +8,13 @@ COPY . .
 RUN npx mintlify build
 
 # Stage 2: Runtime with auth server
-FROM node:20-alpine
+FROM oven/bun:1-alpine
 
 WORKDIR /app
 
-COPY server/package.json server/package-lock.json* ./
+COPY server/package.json server/bun.lock* ./
 
-RUN npm install --omit=dev
+RUN bun install --production
 
 COPY server/index.js ./index.js
 
@@ -27,4 +27,4 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-CMD ["node", "index.js"]
+CMD ["bun", "run", "index.js"]

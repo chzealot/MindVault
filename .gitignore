@@ -1,3 +1,4 @@
 node_modules
 .mintlify
 .env
+bun.lock
