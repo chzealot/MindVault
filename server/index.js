@@ -28,22 +28,26 @@ const ALLOWED_USERS = (process.env.ALLOWED_USERS || "")
   .filter(Boolean);
 
 // ---------------------------------------------------------------------------
-// Validate required config
+// Validate required config (log errors but don't exit — let healthz work for K8s)
 // ---------------------------------------------------------------------------
+const configErrors = [];
+
 if (!CLIENT_ID || !CLIENT_SECRET) {
-  console.error("ERROR: OIDC_CLIENT_ID and OIDC_CLIENT_SECRET must be set.");
-  process.exit(1);
+  configErrors.push("OIDC_CLIENT_ID and OIDC_CLIENT_SECRET must be set.");
 }
 
 if (ALLOWED_USERS.length === 0) {
-  console.error("ERROR: ALLOWED_USERS must contain at least one email or phone.");
-  process.exit(1);
+  configErrors.push("ALLOWED_USERS must contain at least one email or phone.");
 }
 
 if (!fs.existsSync(STATIC_DIR)) {
-  console.error(`ERROR: Static directory not found: ${STATIC_DIR}`);
-  console.error("Run 'npx mintlify export' first, or set STATIC_DIR to the correct path.");
-  process.exit(1);
+  configErrors.push(`Static directory not found: ${STATIC_DIR}. Run 'npx mintlify export' first, or set STATIC_DIR to the correct path.`);
+}
+
+if (configErrors.length > 0) {
+  for (const err of configErrors) {
+    console.error(`CONFIG ERROR: ${err}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -82,9 +86,32 @@ app.use(
 );
 
 // ---------------------------------------------------------------------------
-// Health check (unauthenticated)
+// Health check (unauthenticated, always responds even with config errors)
 // ---------------------------------------------------------------------------
-app.get("/healthz", (_req, res) => res.send("ok"));
+app.get("/healthz", (_req, res) => {
+  if (configErrors.length > 0) {
+    return res.send(`degraded: ${configErrors.join("; ")}`);
+  }
+  res.send("ok");
+});
+
+// ---------------------------------------------------------------------------
+// Config guard: block all non-health routes if config is invalid
+// ---------------------------------------------------------------------------
+if (configErrors.length > 0) {
+  app.use((_req, res) => {
+    res.status(503).send(`
+      <html>
+        <body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:system-ui;">
+          <div style="text-align:center;">
+            <h1>503 Service Unavailable</h1>
+            <p>Server configuration error. Check container logs.</p>
+          </div>
+        </body>
+      </html>
+    `);
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Auth: login
@@ -236,11 +263,15 @@ app.use((req, res, next) => {
 // ---------------------------------------------------------------------------
 app.use(express.static(STATIC_DIR));
 
-// SPA fallback: serve index.html for unmatched routes
+// SPA fallback: serve index.html for unmatched routes (cached to avoid repeated reads)
+const indexPath = path.join(STATIC_DIR, "index.html");
+const indexHtml = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, "utf-8") : null;
+
 app.use((_req, res) => {
-  const indexPath = path.join(STATIC_DIR, "index.html");
-  const html = fs.readFileSync(indexPath, "utf-8");
-  res.type("html").send(html);
+  if (!indexHtml) {
+    return res.status(404).send("index.html not found");
+  }
+  res.type("html").send(indexHtml);
 });
 
 // ---------------------------------------------------------------------------

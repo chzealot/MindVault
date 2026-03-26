@@ -1,0 +1,9 @@
+.git
+.github
+node_modules
+server/node_modules
+.mintlify
+.env
+.env.*
+*.md
+!README.md
