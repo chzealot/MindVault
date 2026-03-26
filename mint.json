@@ -1,0 +1,128 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "MindVault",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373",
+    "anchors": {
+      "from": "#0D9373",
+      "to": "#07C983"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/chzealot/MindVault"
+    }
+  ],
+  "tabs": [
+    {
+      "name": "Engineering",
+      "url": "engineering"
+    },
+    {
+      "name": "Reading",
+      "url": "reading"
+    },
+    {
+      "name": "Thinking",
+      "url": "thinking"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Welcome",
+      "pages": [
+        "introduction",
+        "quickstart"
+      ]
+    },
+    {
+      "group": "Engineering",
+      "pages": [
+        "engineering/overview",
+        {
+          "group": "Architecture",
+          "pages": [
+            "engineering/architecture/system-design",
+            "engineering/architecture/distributed-systems"
+          ]
+        },
+        {
+          "group": "Backend",
+          "pages": [
+            "engineering/backend/golang",
+            "engineering/backend/python"
+          ]
+        },
+        {
+          "group": "Frontend",
+          "pages": [
+            "engineering/frontend/react",
+            "engineering/frontend/typescript"
+          ]
+        },
+        {
+          "group": "DevOps",
+          "pages": [
+            "engineering/devops/docker",
+            "engineering/devops/kubernetes",
+            "engineering/devops/ci-cd"
+          ]
+        },
+        {
+          "group": "AI & ML",
+          "pages": [
+            "engineering/ai/llm",
+            "engineering/ai/prompt-engineering"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "Reading",
+      "pages": [
+        "reading/overview",
+        {
+          "group": "Tech Books",
+          "pages": [
+            "reading/tech/index"
+          ]
+        },
+        {
+          "group": "Non-Tech Books",
+          "pages": [
+            "reading/non-tech/index"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "Thinking",
+      "pages": [
+        "thinking/overview",
+        {
+          "group": "Tech Insights",
+          "pages": [
+            "thinking/tech/index"
+          ]
+        },
+        {
+          "group": "Life",
+          "pages": [
+            "thinking/life/index"
+          ]
+        }
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/chzealot"
+  }
+}
