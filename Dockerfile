@@ -17,7 +17,7 @@ WORKDIR /app
 
 COPY server/package.json server/bun.lock* ./
 
-RUN bun install --production
+RUN apk add --no-cache curl && bun install --production
 
 COPY server/index.js ./index.js
 
