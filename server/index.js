@@ -301,6 +301,7 @@ app.get("/auth/callback", async (req, res) => {
       email: merged.email,
       phone: merged.phone_number || merged.phone,
       name: merged.name || merged.preferred_username,
+      picture: merged.picture || null,
     };
     delete req.session.oidc;
 
@@ -358,19 +359,104 @@ app.use((req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// Serve static Mintlify site
+// User menu injection snippet (injected before </body> in HTML responses)
 // ---------------------------------------------------------------------------
+const userMenuSnippet = `
+<style>
+  .mv-user-menu{position:fixed;top:16px;right:16px;z-index:99999;font-family:system-ui,-apple-system,sans-serif}
+  .mv-avatar{width:36px;height:36px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .2s;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#fff;background:#6366f1;overflow:hidden;user-select:none}
+  .mv-avatar:hover{border-color:#6366f1}
+  .mv-avatar img{width:100%;height:100%;object-fit:cover}
+  .mv-dropdown{position:absolute;top:44px;right:0;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.1);min-width:160px;opacity:0;visibility:hidden;transform:translateY(-4px);transition:all .15s ease}
+  .mv-user-menu:hover .mv-dropdown,.mv-dropdown.mv-show{opacity:1;visibility:visible;transform:translateY(0)}
+  .mv-dropdown a{display:flex;align-items:center;gap:8px;padding:10px 16px;color:#374151;text-decoration:none;font-size:14px;transition:background .15s}
+  .mv-dropdown a:first-child{border-radius:8px 8px 0 0}
+  .mv-dropdown a:last-child{border-radius:0 0 8px 8px}
+  .mv-dropdown a:hover{background:#f3f4f6}
+  .mv-dropdown .mv-divider{border-top:1px solid #e5e7eb;margin:0}
+  @media(prefers-color-scheme:dark){
+    .mv-dropdown{background:#1f2937;border-color:#374151}
+    .mv-dropdown a{color:#e5e7eb}
+    .mv-dropdown a:hover{background:#374151}
+    .mv-dropdown .mv-divider{border-color:#374151}
+  }
+</style>
+<script>
+(function(){
+  fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
+    if(!u)return;
+    var d=document.createElement('div');d.className='mv-user-menu';
+    var name=u.name||u.email||'U';
+    var initials=name.charAt(0).toUpperCase();
+    var avatarInner=u.picture?'<img src="'+u.picture+'" alt="avatar">':initials;
+    d.innerHTML='<div class="mv-avatar">'+avatarInner+'</div>'
+      +'<div class="mv-dropdown">'
+      +'<a href="https://accounts.appforges.com" target="_blank">'
+      +'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+      +'用户中心</a>'
+      +'<div class="mv-divider"></div>'
+      +'<a href="/auth/logout">'
+      +'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>'
+      +'退出登录</a>'
+      +'</div>';
+    document.body.appendChild(d);
+  });
+})();
+</script>`;
+
+function injectUserMenu(html) {
+  if (html.includes("</body>")) {
+    return html.replace("</body>", userMenuSnippet + "</body>");
+  }
+  return html + userMenuSnippet;
+}
+
+// ---------------------------------------------------------------------------
+// Resolve HTML file path: try exact, .html extension, and /index.html
+// ---------------------------------------------------------------------------
+function resolveHtmlFile(reqPath) {
+  const safePath = path.normalize(reqPath).replace(/^(\.\.(\/|\\|$))+/, "");
+  const candidates = [
+    path.join(STATIC_DIR, safePath),
+    path.join(STATIC_DIR, safePath + ".html"),
+    path.join(STATIC_DIR, safePath, "index.html"),
+  ];
+  for (const p of candidates) {
+    if (p.endsWith(".html") && fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Serve static Mintlify site (with user menu injection for HTML)
+// ---------------------------------------------------------------------------
+// Serve HTML pages with user menu injection (handles /foo -> /foo.html)
+app.use((req, res, next) => {
+  // Skip non-GET or requests with file extensions that aren't .html
+  if (req.method !== "GET") return next();
+  const ext = path.extname(req.path);
+  if (ext && ext !== ".html") return next();
+
+  const htmlFile = resolveHtmlFile(req.path);
+  if (htmlFile) {
+    const html = fs.readFileSync(htmlFile, "utf-8");
+    return res.type("html").send(injectUserMenu(html));
+  }
+  next();
+});
+
 app.use(express.static(STATIC_DIR));
 
-// SPA fallback: serve index.html for unmatched routes (cached to avoid repeated reads)
+// SPA fallback: serve index.html for unmatched routes
 const indexPath = path.join(STATIC_DIR, "index.html");
 const indexHtml = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, "utf-8") : null;
+const indexHtmlWithMenu = indexHtml ? injectUserMenu(indexHtml) : null;
 
 app.use((_req, res) => {
-  if (!indexHtml) {
+  if (!indexHtmlWithMenu) {
     return res.status(404).send("index.html not found");
   }
-  res.type("html").send(indexHtml);
+  res.type("html").send(indexHtmlWithMenu);
 });
 
 // ---------------------------------------------------------------------------
