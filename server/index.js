@@ -436,20 +436,20 @@ function isPageNavigation(req) {
   return accept.includes("text/html");
 }
 
-// Serve HTML pages with user menu injection (handles /foo -> /foo.html)
+// Serve HTML pages (handles /foo -> /foo.html), inject user menu for page navigations
 app.use((req, res, next) => {
   if (req.method !== "GET") return next();
-  // Skip requests for static assets (_next, images, etc.)
-  if (req.path.startsWith("/_next/")) return next();
+  // Skip static assets
+  if (req.path.startsWith("/_next/") || req.path.startsWith("/_mintlify/")) return next();
   const ext = path.extname(req.path);
   if (ext && ext !== ".html") return next();
-  // Only inject menu for browser page navigations, not XHR/fetch
-  if (!isPageNavigation(req)) return next();
 
   const htmlFile = resolveHtmlFile(req.path);
   if (htmlFile) {
     const html = fs.readFileSync(htmlFile, "utf-8");
-    return res.type("html").send(injectUserMenu(html));
+    // Only inject user menu for full page navigations, not RSC data fetches
+    const content = isPageNavigation(req) ? injectUserMenu(html) : html;
+    return res.type("html").send(content);
   }
   next();
 });
@@ -462,14 +462,12 @@ const indexHtml = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, "utf-8")
 const indexHtmlWithMenu = indexHtml ? injectUserMenu(indexHtml) : null;
 
 app.use((req, res) => {
-  if (!indexHtmlWithMenu) {
+  if (!indexHtml) {
     return res.status(404).send("index.html not found");
   }
-  // Only serve SPA fallback for page navigations
-  if (isPageNavigation(req)) {
-    return res.type("html").send(indexHtmlWithMenu);
-  }
-  res.status(404).json({ error: "not found" });
+  // Inject user menu only for page navigations, serve raw HTML for RSC
+  const content = isPageNavigation(req) ? indexHtmlWithMenu : indexHtml;
+  res.type("html").send(content);
 });
 
 // ---------------------------------------------------------------------------
