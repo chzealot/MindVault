@@ -78,11 +78,18 @@ let oidcConfig;
 
 async function getOIDCConfig() {
   if (oidcConfig) return oidcConfig;
-  oidcConfig = await client.discovery(
-    new URL(OIDC_DISCOVERY_URL),
-    CLIENT_ID,
-    CLIENT_SECRET,
-  );
+  console.log("[OIDC] Discovering OIDC configuration from:", OIDC_DISCOVERY_URL);
+  try {
+    oidcConfig = await client.discovery(
+      new URL(OIDC_DISCOVERY_URL),
+      CLIENT_ID,
+      CLIENT_SECRET,
+    );
+    console.log("[OIDC] Discovery successful. Issuer:", oidcConfig.serverMetadata().issuer);
+  } catch (err) {
+    console.error("[OIDC] Discovery FAILED:", err.message);
+    throw err;
+  }
   return oidcConfig;
 }
 
@@ -105,6 +112,20 @@ app.use(
     },
   }),
 );
+
+// ---------------------------------------------------------------------------
+// Access log middleware
+// ---------------------------------------------------------------------------
+app.use((req, res, next) => {
+  const start = Date.now();
+  const { method, originalUrl } = req;
+  res.on("finish", () => {
+    const ms = Date.now() - start;
+    const level = res.statusCode >= 500 ? "ERROR" : res.statusCode >= 400 ? "WARN" : "INFO";
+    console.log(`[ACCESS] ${level} ${method} ${originalUrl} -> ${res.statusCode} (${ms}ms)`);
+  });
+  next();
+});
 
 // ---------------------------------------------------------------------------
 // Health check (unauthenticated, always responds even with config errors)
@@ -142,9 +163,11 @@ if (configErrors.length > 0) {
 // Auth: login
 // ---------------------------------------------------------------------------
 app.get("/auth/login", async (req, res) => {
+  console.log("[AUTH] Login initiated, returnTo:", req.session.returnTo || "/");
   try {
     const config = await getOIDCConfig();
     const redirectUri = `${BASE_URL}/auth/callback`;
+    console.log("[AUTH] Redirect URI:", redirectUri);
 
     const nonce = client.randomNonce();
     const state = client.randomState();
@@ -163,9 +186,11 @@ app.get("/auth/login", async (req, res) => {
       code_challenge_method: "S256",
     });
 
+    console.log("[AUTH] Redirecting to OIDC provider:", authUrl.origin + authUrl.pathname);
     res.redirect(authUrl.href);
   } catch (err) {
-    console.error("Login error:", err);
+    console.error("[AUTH] Login error:", err.message);
+    console.error("[AUTH] Login error stack:", err.stack);
     res.status(500).send("Authentication service unavailable. Please try again later.");
   }
 });
@@ -174,16 +199,19 @@ app.get("/auth/login", async (req, res) => {
 // Auth: callback
 // ---------------------------------------------------------------------------
 app.get("/auth/callback", async (req, res) => {
+  console.log("[AUTH] Callback received, query params:", Object.keys(req.query).join(", "));
   try {
     const config = await getOIDCConfig();
     const { nonce, state, codeVerifier, redirectUri } = req.session.oidc || {};
 
     if (!nonce || !state || !codeVerifier) {
+      console.warn("[AUTH] Callback missing OIDC session data (nonce/state/codeVerifier), redirecting to login");
       return res.redirect("/auth/login");
     }
 
     // openid-client v6 expects a URL for the current request
     const currentUrl = new URL(req.originalUrl, BASE_URL);
+    console.log("[AUTH] Exchanging authorization code, currentUrl:", currentUrl.toString());
 
     const tokens = await client.authorizationCodeGrant(config, currentUrl, {
       expectedNonce: nonce,
@@ -191,15 +219,18 @@ app.get("/auth/callback", async (req, res) => {
       pkceCodeVerifier: codeVerifier,
       idTokenExpected: true,
     });
+    console.log("[AUTH] Token exchange successful");
 
     const claims = tokens.claims();
+    console.log("[AUTH] ID token claims sub:", claims.sub);
 
     // Also try userinfo for more claims (phone, etc.)
     let userinfo = {};
     try {
       userinfo = await client.fetchUserInfo(config, tokens.access_token, claims.sub);
-    } catch {
-      // userinfo endpoint may not be available, continue with id_token claims
+      console.log("[AUTH] UserInfo fetched, keys:", Object.keys(userinfo).join(", "));
+    } catch (e) {
+      console.warn("[AUTH] UserInfo fetch failed (non-fatal):", e.message);
     }
 
     const merged = { ...claims, ...userinfo };
@@ -214,14 +245,16 @@ app.get("/auth/callback", async (req, res) => {
       .filter(Boolean)
       .map((s) => s.toLowerCase());
 
+    console.log("[AUTH] User identifiers:", identifiers.join(", "));
     const isAllowed = identifiers.some((id) => ALLOWED_USERS.includes(id));
+    console.log("[AUTH] Access allowed:", isAllowed);
 
     if (!isAllowed) {
       // Clean up session
       delete req.session.oidc;
       delete req.session.user;
       console.warn(
-        `Access denied for user: ${merged.sub} (identifiers: ${identifiers.join(", ")})`,
+        `[AUTH] Access DENIED for user: ${merged.sub} (identifiers: ${identifiers.join(", ")})`,
       );
       return res.status(403).send(`
         <html>
@@ -245,10 +278,13 @@ app.get("/auth/callback", async (req, res) => {
     };
     delete req.session.oidc;
 
-    res.redirect(req.session.returnTo || "/");
+    const returnTo = req.session.returnTo || "/";
     delete req.session.returnTo;
+    console.log("[AUTH] Login successful for:", merged.email || merged.sub, "-> redirecting to:", returnTo);
+    res.redirect(returnTo);
   } catch (err) {
-    console.error("Callback error:", err);
+    console.error("[AUTH] Callback error:", err.message);
+    console.error("[AUTH] Callback error stack:", err.stack);
     res.status(500).send("Authentication failed. Please try again.");
   }
 });
@@ -279,6 +315,7 @@ app.use((req, res, next) => {
   if (req.session.user) {
     return next();
   }
+  console.log(`[AUTH] Unauthenticated request: ${req.method} ${req.originalUrl} -> redirecting to /auth/login`);
   req.session.returnTo = req.originalUrl;
   res.redirect("/auth/login");
 });
@@ -312,9 +349,21 @@ const server = app.listen(PORT, () => {
 
 server.on("error", (err) => {
   if (err.code === "EADDRINUSE") {
-    console.error(`ERROR: Port ${PORT} is already in use. Try: kill $(lsof -ti :${PORT}) or use a different port with PORT=<port>`);
+    console.error(`[ERROR] Port ${PORT} is already in use.`);
   } else {
-    console.error(`ERROR: Failed to start server: ${err.message}`);
+    console.error(`[ERROR] Failed to start server: ${err.message}`);
   }
   process.exit(1);
+});
+
+// ---------------------------------------------------------------------------
+// Global error handlers
+// ---------------------------------------------------------------------------
+process.on("uncaughtException", (err) => {
+  console.error("[FATAL] Uncaught exception:", err.message);
+  console.error("[FATAL] Stack:", err.stack);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[FATAL] Unhandled rejection:", reason);
 });
