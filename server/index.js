@@ -1,4 +1,5 @@
 import "dotenv/config";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
@@ -36,6 +37,12 @@ if (!CLIENT_ID || !CLIENT_SECRET) {
 
 if (ALLOWED_USERS.length === 0) {
   console.error("ERROR: ALLOWED_USERS must contain at least one email or phone.");
+  process.exit(1);
+}
+
+if (!fs.existsSync(STATIC_DIR)) {
+  console.error(`ERROR: Static directory not found: ${STATIC_DIR}`);
+  console.error("Run 'npx mintlify export' first, or set STATIC_DIR to the correct path.");
   process.exit(1);
 }
 
@@ -230,16 +237,30 @@ app.use((req, res, next) => {
 app.use(express.static(STATIC_DIR));
 
 // SPA fallback: serve index.html for unmatched routes
-app.use((_req, res) => {
-  res.sendFile(path.join(STATIC_DIR, "index.html"));
+app.use((_req, res, next) => {
+  const indexPath = path.join(STATIC_DIR, "index.html");
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    next();
+  }
 });
 
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`MindVault server running on port ${PORT}`);
   console.log(`OIDC discovery: ${OIDC_DISCOVERY_URL}`);
   console.log(`Allowed users: ${ALLOWED_USERS.join(", ")}`);
   console.log(`Static dir: ${STATIC_DIR}`);
+});
+
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`ERROR: Port ${PORT} is already in use. Try: kill $(lsof -ti :${PORT}) or use a different port with PORT=<port>`);
+  } else {
+    console.error(`ERROR: Failed to start server: ${err.message}`);
+  }
+  process.exit(1);
 });
