@@ -66,3 +66,100 @@ jobs:
           echo "Git commit: ${{ steps.meta.outputs.git_commit }}"
           echo "Built by: ${{ steps.meta.outputs.build_by }}"
           echo "Registry: ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/${{ env.IMAGE_NAME }}"
+
+      - name: Trigger Aliyun ACK Deployment
+        id: trigger_deploy
+        env:
+          ALIYUN_TRIGGER_URL: ${{ secrets.ALIYUN_TRIGGER_URL }}
+        run: |
+          if [ -z "$ALIYUN_TRIGGER_URL" ]; then
+            echo "ALIYUN_TRIGGER_URL not set, skipping deployment trigger"
+            echo "trigger_status=skipped" >> $GITHUB_OUTPUT
+            echo "trigger_message=触发器 URL 未配置" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Triggering Aliyun ACK deployment..."
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" "$ALIYUN_TRIGGER_URL")
+          HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
+          HTTP_CODE=$(echo "$HTTP_RESPONSE" | tail -n 1)
+
+          echo "HTTP Status Code: $HTTP_CODE"
+          echo "Response Body: $HTTP_BODY"
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "Deployment trigger successful!"
+            echo "trigger_status=success" >> $GITHUB_OUTPUT
+            echo "trigger_message=部署触发成功 (HTTP $HTTP_CODE)" >> $GITHUB_OUTPUT
+          else
+            echo "Deployment trigger failed!"
+            echo "trigger_status=failed" >> $GITHUB_OUTPUT
+            echo "trigger_message=部署触发失败 (HTTP $HTTP_CODE)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send DingTalk notification - Success
+        if: success()
+        env:
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+        run: |
+          if [ -z "$DINGTALK_WEBHOOK" ]; then
+            echo "DINGTALK_WEBHOOK not set, skipping notification"
+            exit 0
+          fi
+
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          BRANCH="${{ github.ref_name }}"
+          AUTHOR="${{ github.actor }}"
+          REPO="${{ github.repository }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          IMAGE_TAG="${{ steps.meta.outputs.tag }}"
+          IMAGE_REPO="${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/${{ env.IMAGE_NAME }}"
+          BUILD_TIME="${{ steps.meta.outputs.build_time }}"
+          TRIGGER_STATUS="${{ steps.trigger_deploy.outputs.trigger_status }}"
+          TRIGGER_MESSAGE="${{ steps.trigger_deploy.outputs.trigger_message }}"
+
+          if [ "$TRIGGER_STATUS" = "success" ]; then
+            DEPLOY_ICON="✅"
+          elif [ "$TRIGGER_STATUS" = "skipped" ]; then
+            DEPLOY_ICON="⏭️"
+          else
+            DEPLOY_ICON="⚠️"
+          fi
+
+          curl -X POST "$DINGTALK_WEBHOOK" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"msgtype\": \"markdown\",
+              \"markdown\": {
+                \"title\": \"🚀 Docker 镜像推送成功 - mindvault\",
+                \"text\": \"### 🚀 Docker 镜像推送成功\\n\\n**项目:** ${REPO}\\n\\n**版本:** ${IMAGE_TAG}\\n\\n**提交者:** ${AUTHOR}\\n\\n**提交信息:** ${COMMIT_MSG}\\n\\n**镜像仓库:** ${IMAGE_REPO}\\n\\n**构建时间:** ${BUILD_TIME}\\n\\n---\\n\\n${DEPLOY_ICON} **部署触发:** ${TRIGGER_MESSAGE}\\n\\n[查看详情](${RUN_URL})\"
+              }
+            }"
+
+      - name: Send DingTalk notification - Failed
+        if: failure()
+        env:
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+        run: |
+          if [ -z "$DINGTALK_WEBHOOK" ]; then
+            echo "DINGTALK_WEBHOOK not set, skipping notification"
+            exit 0
+          fi
+
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          BRANCH="${{ github.ref_name }}"
+          AUTHOR="${{ github.actor }}"
+          REPO="${{ github.repository }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          IMAGE_TAG="${{ steps.meta.outputs.tag }}"
+          BUILD_TIME="${{ steps.meta.outputs.build_time }}"
+
+          curl -X POST "$DINGTALK_WEBHOOK" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"msgtype\": \"markdown\",
+              \"markdown\": {
+                \"title\": \"❌ Docker 镜像构建失败 - mindvault\",
+                \"text\": \"### ❌ Docker 镜像构建失败\\n\\n**项目:** ${REPO}\\n\\n**版本:** ${IMAGE_TAG}\\n\\n**提交者:** ${AUTHOR}\\n\\n**提交信息:** ${COMMIT_MSG}\\n\\n**构建时间:** ${BUILD_TIME}\\n\\n[查看详情](${RUN_URL})\"
+              }
+            }"
