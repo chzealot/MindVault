@@ -100,8 +100,20 @@ const app = express();
 
 app.set("trust proxy", 1);
 
+// Ensure X-Forwarded-Proto is set when behind a TLS-terminating proxy (e.g. K8s ingress).
+// express-session refuses to set Secure cookies if req.secure is false.
+if (BASE_URL.startsWith("https")) {
+  app.use((req, _res, next) => {
+    if (!req.headers["x-forwarded-proto"]) {
+      req.headers["x-forwarded-proto"] = "https";
+    }
+    next();
+  });
+}
+
 app.use(
   session({
+    name: "mindvault.sid",
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
