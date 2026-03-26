@@ -108,6 +108,7 @@ app.use(
     cookie: {
       secure: BASE_URL.startsWith("https"),
       httpOnly: true,
+      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     },
   }),
@@ -187,7 +188,15 @@ app.get("/auth/login", async (req, res) => {
     });
 
     console.log("[AUTH] Redirecting to OIDC provider:", authUrl.origin + authUrl.pathname);
-    res.redirect(authUrl.href);
+    // Explicitly save session before redirect to prevent race condition
+    req.session.save((err) => {
+      if (err) {
+        console.error("[AUTH] Failed to save session before login redirect:", err);
+        return res.status(500).send("Session error");
+      }
+      console.log("[AUTH] Session saved, session ID:", req.sessionID);
+      res.redirect(authUrl.href);
+    });
   } catch (err) {
     console.error("[AUTH] Login error:", err.message);
     console.error("[AUTH] Login error stack:", err.stack);
@@ -200,12 +209,17 @@ app.get("/auth/login", async (req, res) => {
 // ---------------------------------------------------------------------------
 app.get("/auth/callback", async (req, res) => {
   console.log("[AUTH] Callback received, query params:", Object.keys(req.query).join(", "));
+  console.log("[AUTH] Callback session ID:", req.sessionID);
+  console.log("[AUTH] Callback session.oidc exists:", !!req.session.oidc);
+  console.log("[AUTH] Callback session keys:", Object.keys(req.session).join(", "));
+  console.log("[AUTH] Callback cookies:", req.headers.cookie || "(none)");
   try {
     const config = await getOIDCConfig();
     const { nonce, state, codeVerifier, redirectUri } = req.session.oidc || {};
 
     if (!nonce || !state || !codeVerifier) {
       console.warn("[AUTH] Callback missing OIDC session data (nonce/state/codeVerifier), redirecting to login");
+      console.warn("[AUTH] Session contents:", JSON.stringify(req.session, null, 2));
       return res.redirect("/auth/login");
     }
 
@@ -281,7 +295,15 @@ app.get("/auth/callback", async (req, res) => {
     const returnTo = req.session.returnTo || "/";
     delete req.session.returnTo;
     console.log("[AUTH] Login successful for:", merged.email || merged.sub, "-> redirecting to:", returnTo);
-    res.redirect(returnTo);
+    // Explicitly save session before redirect to ensure user data persists
+    req.session.save((err) => {
+      if (err) {
+        console.error("[AUTH] Failed to save session after login:", err);
+        return res.status(500).send("Session error");
+      }
+      console.log("[AUTH] Session saved after login, session ID:", req.sessionID);
+      res.redirect(returnTo);
+    });
   } catch (err) {
     console.error("[AUTH] Callback error:", err.message);
     console.error("[AUTH] Callback error stack:", err.stack);
@@ -317,7 +339,10 @@ app.use((req, res, next) => {
   }
   console.log(`[AUTH] Unauthenticated request: ${req.method} ${req.originalUrl} -> redirecting to /auth/login`);
   req.session.returnTo = req.originalUrl;
-  res.redirect("/auth/login");
+  req.session.save((err) => {
+    if (err) console.error("[AUTH] Failed to save returnTo:", err);
+    res.redirect("/auth/login");
+  });
 });
 
 // ---------------------------------------------------------------------------
