@@ -237,13 +237,10 @@ app.use((req, res, next) => {
 app.use(express.static(STATIC_DIR));
 
 // SPA fallback: serve index.html for unmatched routes
-app.use((_req, res, next) => {
+app.use((_req, res) => {
   const indexPath = path.join(STATIC_DIR, "index.html");
-  if (fs.existsSync(indexPath)) {
-    res.sendFile(indexPath);
-  } else {
-    next();
-  }
+  const html = fs.readFileSync(indexPath, "utf-8");
+  res.type("html").send(html);
 });
 
 // ---------------------------------------------------------------------------

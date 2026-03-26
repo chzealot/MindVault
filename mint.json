@@ -23,46 +23,46 @@
   ],
   "tabs": [
     {
-      "name": "Engineering",
+      "name": "工程技术",
       "url": "engineering"
     },
     {
-      "name": "Reading",
+      "name": "阅读笔记",
       "url": "reading"
     },
     {
-      "name": "Thinking",
+      "name": "随想",
       "url": "thinking"
     }
   ],
   "navigation": [
     {
-      "group": "Welcome",
+      "group": "欢迎",
       "pages": [
         "introduction",
         "quickstart"
       ]
     },
     {
-      "group": "Engineering",
+      "group": "工程技术",
       "pages": [
         "engineering/overview",
         {
-          "group": "Architecture",
+          "group": "架构设计",
           "pages": [
             "engineering/architecture/system-design",
             "engineering/architecture/distributed-systems"
           ]
         },
         {
-          "group": "Backend",
+          "group": "后端开发",
           "pages": [
             "engineering/backend/golang",
             "engineering/backend/python"
           ]
         },
         {
-          "group": "Frontend",
+          "group": "前端开发",
           "pages": [
             "engineering/frontend/react",
             "engineering/frontend/typescript"
@@ -86,17 +86,17 @@
       ]
     },
     {
-      "group": "Reading",
+      "group": "阅读笔记",
       "pages": [
         "reading/overview",
         {
-          "group": "Tech Books",
+          "group": "技术书籍",
           "pages": [
             "reading/tech/index"
           ]
         },
         {
-          "group": "Non-Tech Books",
+          "group": "非技术书籍",
           "pages": [
             "reading/non-tech/index"
           ]
@@ -104,17 +104,17 @@
       ]
     },
     {
-      "group": "Thinking",
+      "group": "随想",
       "pages": [
         "thinking/overview",
         {
-          "group": "Tech Insights",
+          "group": "技术洞察",
           "pages": [
             "thinking/tech/index"
           ]
         },
         {
-          "group": "Life",
+          "group": "生活感悟",
           "pages": [
             "thinking/life/index"
           ]

@@ -1,8 +1,19 @@
 ---
-title: Distributed Systems
-description: "Notes on distributed systems concepts."
+title: 分布式系统
+description: "分布式系统核心概念笔记。"
 ---
 
-# Distributed Systems
+# 分布式系统
 
-_To be filled._
+## 核心挑战
+
+- **CAP 定理**：一致性、可用性、分区容错性三者最多满足其二
+- **数据一致性**：Paxos、Raft 等共识算法
+- **容错与恢复**：故障检测、自动恢复、降级策略
+
+## 关键技术
+
+- 分布式锁
+- 分布式事务（2PC、TCC、Saga）
+- 一致性哈希
+- 服务发现与注册

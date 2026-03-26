@@ -1,8 +1,18 @@
 ---
 title: Docker
-description: "Docker notes and best practices."
+description: "Docker 笔记与最佳实践。"
 ---
 
 # Docker
 
-_To be filled._
+## 核心概念
+
+- 镜像分层与缓存机制
+- 多阶段构建减小镜像体积
+- 网络模式：bridge、host、overlay
+
+## 最佳实践
+
+- 使用 `.dockerignore` 排除无关文件
+- 非 root 用户运行容器
+- 合理利用构建缓存，将变化频繁的层放在最后
