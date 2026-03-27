@@ -436,38 +436,49 @@ function isPageNavigation(req) {
   return accept.includes("text/html");
 }
 
-// Serve HTML pages (handles /foo -> /foo.html), inject user menu for page navigations
+// Serve static assets first (JS, CSS, images, fonts, etc.)
+app.use(express.static(STATIC_DIR));
+
+// Resolve HTML file path: try exact, .html extension, and /index.html
+// (mirrors Mintlify serve.js behavior)
 app.use((req, res, next) => {
   if (req.method !== "GET") return next();
-  // Skip static assets
+
+  // RSC data fetches (Next.js client navigation) — must return 404 so the
+  // client falls back to a full-page navigation which loads index.html correctly.
+  // Returning index.html HTML for RSC requests causes Next.js to fail parsing → 500.
+  if (req.query._rsc) {
+    return res.status(404).end();
+  }
+
+  // Skip non-page requests
   if (req.path.startsWith("/_next/") || req.path.startsWith("/_mintlify/")) return next();
   const ext = path.extname(req.path);
   if (ext && ext !== ".html") return next();
 
+  // Try to find an actual HTML file (e.g. /foo → /foo.html or /foo/index.html)
   const htmlFile = resolveHtmlFile(req.path);
   if (htmlFile) {
     const html = fs.readFileSync(htmlFile, "utf-8");
-    // Only inject user menu for full page navigations, not RSC data fetches
-    const content = isPageNavigation(req) ? injectUserMenu(html) : html;
-    return res.type("html").send(content);
+    return res.type("html").send(isPageNavigation(req) ? injectUserMenu(html) : html);
   }
   next();
 });
 
-app.use(express.static(STATIC_DIR));
-
-// SPA fallback: serve index.html for unmatched routes
+// SPA fallback: serve index.html for browser page navigations only
 const indexPath = path.join(STATIC_DIR, "index.html");
 const indexHtml = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, "utf-8") : null;
 const indexHtmlWithMenu = indexHtml ? injectUserMenu(indexHtml) : null;
 
 app.use((req, res) => {
   if (!indexHtml) {
-    return res.status(404).send("index.html not found");
+    return res.status(404).send("Not found");
   }
-  // Inject user menu only for page navigations, serve raw HTML for RSC
-  const content = isPageNavigation(req) ? indexHtmlWithMenu : indexHtml;
-  res.type("html").send(content);
+  // Only serve SPA fallback for browser page navigations
+  if (isPageNavigation(req)) {
+    return res.type("html").send(indexHtmlWithMenu);
+  }
+  res.status(404).end();
 });
 
 // ---------------------------------------------------------------------------
