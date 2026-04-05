@@ -452,6 +452,10 @@ function isPageNavigation(req) {
   return accept.includes("text/html");
 }
 
+// Mintlify dev-only endpoints — return empty responses to avoid 404 noise
+app.get("/_mintlify/api/user", (_req, res) => res.json(null));
+app.use("/socket.io", (_req, res) => res.status(204).end());
+
 // Serve static assets (JS, CSS, images, fonts, etc.)
 app.use(express.static(STATIC_DIR));
 
