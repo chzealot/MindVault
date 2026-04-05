@@ -1,0 +1,137 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "MindVault",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "欢迎",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "工程技术",
+        "groups": [
+          {
+            "group": "工程技术",
+            "pages": [
+              "engineering/overview",
+              {
+                "group": "架构设计",
+                "pages": [
+                  "engineering/architecture/system-design",
+                  "engineering/architecture/distributed-systems"
+                ]
+              },
+              {
+                "group": "后端开发",
+                "pages": [
+                  "engineering/backend/golang",
+                  "engineering/backend/python"
+                ]
+              },
+              {
+                "group": "前端开发",
+                "pages": [
+                  "engineering/frontend/react",
+                  "engineering/frontend/typescript"
+                ]
+              },
+              {
+                "group": "DevOps",
+                "pages": [
+                  "engineering/devops/docker",
+                  "engineering/devops/kubernetes",
+                  "engineering/devops/ci-cd"
+                ]
+              },
+              {
+                "group": "AI & ML",
+                "pages": [
+                  "engineering/ai/llm",
+                  "engineering/ai/prompt-engineering"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "阅读笔记",
+        "groups": [
+          {
+            "group": "阅读笔记",
+            "pages": [
+              "reading/overview",
+              {
+                "group": "技术书籍",
+                "pages": [
+                  "reading/tech/index"
+                ]
+              },
+              {
+                "group": "非技术书籍",
+                "pages": [
+                  "reading/non-tech/index"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "随想",
+        "groups": [
+          {
+            "group": "随想",
+            "pages": [
+              "thinking/overview",
+              {
+                "group": "技术洞察",
+                "pages": [
+                  "thinking/tech/index"
+                ]
+              },
+              {
+                "group": "生活感悟",
+                "pages": [
+                  "thinking/life/index"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/chzealot/MindVault"
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/chzealot"
+    }
+  }
+}

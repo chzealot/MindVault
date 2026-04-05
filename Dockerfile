@@ -5,7 +5,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN npx mintlify export --output export.zip && \
+RUN npx mint@latest export --output export.zip && \
     mkdir -p /app/output && \
     unzip export.zip -d /app/output && \
     rm export.zip
