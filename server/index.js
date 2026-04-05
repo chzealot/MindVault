@@ -479,11 +479,44 @@ const indexPath = path.join(STATIC_DIR, "index.html");
 const indexHtml = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, "utf-8") : null;
 const indexHtmlWithMenu = indexHtml ? injectUserMenu(indexHtml) : null;
 
+// ---------------------------------------------------------------------------
+// RSC prefetch handler: Mintlify SPA export produces a single index.html.
+// Next.js client automatically prefetches RSC data for visible links on page
+// load — these can't be prevented by click interceptors. Return the root
+// page's embedded RSC flight data for all _rsc requests to avoid 404 errors.
+// Actual page navigation uses the injected click interceptor (full-page nav).
+// ---------------------------------------------------------------------------
+const RSC_PUSH_RE = /<script>self\.__next_f\.push\((\[.+?\])\)<\/script>/g;
+let rootRscData = null;
+
+if (indexHtml) {
+  let data = "";
+  let m;
+  while ((m = RSC_PUSH_RE.exec(indexHtml))) {
+    try {
+      const arr = JSON.parse(m[1]);
+      if (arr[0] === 1 && typeof arr[1] === "string") {
+        data += arr[1];
+      }
+    } catch {
+      // skip malformed chunks
+    }
+  }
+  if (data) {
+    rootRscData = data;
+    console.log(`[BOOT] Extracted RSC data from index.html (${data.length} bytes)`);
+  }
+}
+
 app.use((req, res) => {
   if (!indexHtml) {
     return res.status(404).send("Not found");
   }
-  // Only serve SPA fallback for browser page navigations
+  // RSC data requests — serve extracted flight data to avoid 404s
+  if (req.query._rsc && rootRscData) {
+    return res.type("text/x-component").send(rootRscData);
+  }
+  // Browser page navigations — serve SPA HTML with user menu
   if (isPageNavigation(req)) {
     return res.type("html").send(indexHtmlWithMenu);
   }
