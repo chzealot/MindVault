@@ -8,8 +8,7 @@ COPY . .
 RUN npx mintlify export --output export.zip && \
     mkdir -p /app/output && \
     unzip export.zip -d /app/output && \
-    rm export.zip && \
-    node /app/scripts/generate-rsc.js /app/output
+    rm export.zip
 
 # Stage 2: Runtime with auth server
 FROM oven/bun:1-alpine

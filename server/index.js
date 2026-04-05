@@ -401,6 +401,22 @@ const userMenuSnippet = `
       +'</div>';
     document.body.appendChild(d);
   });
+
+  // Force full-page navigation for internal links.
+  // Mintlify SPA export uses Next.js client-side routing (RSC fetches) which
+  // requires a Next.js server. Since we serve static files via Express, RSC
+  // requests fail. Intercepting clicks and using window.location ensures
+  // each page loads its own HTML with embedded RSC data.
+  document.addEventListener('click', function(e) {
+    var a = e.target.closest('a');
+    if (!a) return;
+    var href = a.getAttribute('href');
+    if (!href || href.startsWith('#') || href.startsWith('http') || href.startsWith('mailto:') || a.target === '_blank') return;
+    // Let the browser do a full navigation instead of Next.js client routing
+    e.preventDefault();
+    e.stopPropagation();
+    window.location.href = href;
+  }, true);
 })();
 </script>`;
 
@@ -428,47 +444,6 @@ function resolveHtmlFile(reqPath) {
 }
 
 // ---------------------------------------------------------------------------
-// Resolve RSC file path: try index.rsc in the corresponding directory
-// ---------------------------------------------------------------------------
-function resolveRscFile(reqPath) {
-  const safePath = path.normalize(reqPath).replace(/^(\.\.(\/|\\|$))+/, "");
-  const candidates = [
-    path.join(STATIC_DIR, safePath, "index.rsc"),
-    path.join(STATIC_DIR, safePath + ".rsc"),
-  ];
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return p;
-  }
-  return null;
-}
-
-// ---------------------------------------------------------------------------
-// Extract RSC flight data from HTML at runtime (fallback when .rsc file missing)
-// ---------------------------------------------------------------------------
-const rscCache = new Map();
-const RSC_PUSH_RE = /<script>self\.__next_f\.push\((\[.+?\])\)<\/script>/g;
-
-function extractRscFromHtml(htmlPath) {
-  if (rscCache.has(htmlPath)) return rscCache.get(htmlPath);
-  const html = fs.readFileSync(htmlPath, "utf-8");
-  let rscData = "";
-  let m;
-  RSC_PUSH_RE.lastIndex = 0;
-  while ((m = RSC_PUSH_RE.exec(html))) {
-    try {
-      const arr = JSON.parse(m[1]);
-      if (arr[0] === 1 && typeof arr[1] === "string") {
-        rscData += arr[1];
-      }
-    } catch {
-      // skip malformed chunks
-    }
-  }
-  rscCache.set(htmlPath, rscData || null);
-  return rscData || null;
-}
-
-// ---------------------------------------------------------------------------
 // Serve static Mintlify site (with user menu injection for HTML)
 // ---------------------------------------------------------------------------
 // Check if request is a browser page navigation (not XHR/fetch/asset)
@@ -476,31 +451,6 @@ function isPageNavigation(req) {
   const accept = req.headers.accept || "";
   return accept.includes("text/html");
 }
-
-// RSC data fetches MUST be handled BEFORE express.static, otherwise
-// express.static serves the HTML file (wrong Content-Type) and the
-// Next.js client-side router fails to parse the response.
-app.use((req, res, next) => {
-  if (req.method !== "GET" || !req.query._rsc) return next();
-
-  // 1. Try pre-generated .rsc file (build-time)
-  const rscFile = resolveRscFile(req.path);
-  if (rscFile) {
-    const data = fs.readFileSync(rscFile, "utf-8");
-    return res.type("text/x-component").send(data);
-  }
-
-  // 2. Fallback: extract RSC data from the corresponding HTML at runtime
-  const htmlFile = resolveHtmlFile(req.path);
-  if (htmlFile) {
-    const rscData = extractRscFromHtml(htmlFile);
-    if (rscData) {
-      return res.type("text/x-component").send(rscData);
-    }
-  }
-
-  return res.status(404).end();
-});
 
 // Serve static assets (JS, CSS, images, fonts, etc.)
 app.use(express.static(STATIC_DIR));
