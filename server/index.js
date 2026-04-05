@@ -428,6 +428,21 @@ function resolveHtmlFile(reqPath) {
 }
 
 // ---------------------------------------------------------------------------
+// Resolve RSC file path: try index.rsc in the corresponding directory
+// ---------------------------------------------------------------------------
+function resolveRscFile(reqPath) {
+  const safePath = path.normalize(reqPath).replace(/^(\.\.(\/|\\|$))+/, "");
+  const candidates = [
+    path.join(STATIC_DIR, safePath, "index.rsc"),
+    path.join(STATIC_DIR, safePath + ".rsc"),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Serve static Mintlify site (with user menu injection for HTML)
 // ---------------------------------------------------------------------------
 // Check if request is a browser page navigation (not XHR/fetch/asset)
@@ -444,10 +459,15 @@ app.use(express.static(STATIC_DIR));
 app.use((req, res, next) => {
   if (req.method !== "GET") return next();
 
-  // RSC data fetches (Next.js client navigation) — must return 404 so the
-  // client falls back to a full-page navigation which loads index.html correctly.
-  // Returning index.html HTML for RSC requests causes Next.js to fail parsing → 500.
+  // RSC data fetches (Next.js client navigation) — serve pre-generated .rsc files
+  // so the client can update the page without a full reload.
+  // These files are generated at build time by scripts/generate-rsc.js.
   if (req.query._rsc) {
+    const rscFile = resolveRscFile(req.path);
+    if (rscFile) {
+      const data = fs.readFileSync(rscFile, "utf-8");
+      return res.type("text/x-component").send(data);
+    }
     return res.status(404).end();
   }
 
