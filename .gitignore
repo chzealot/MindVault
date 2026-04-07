@@ -1,5 +1,21 @@
+# Dependencies
 node_modules
-.mintlify
+
+# Environment variables
 .env
+
+# Mintlify cache
+.mintlify
+
+# Lock files
 bun.lock
+
+# IDE
 .idea
+.claude
+
+# Raw materials (drafts, source files)
+raw
+
+
+.DS_Store

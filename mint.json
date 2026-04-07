@@ -48,39 +48,9 @@
       "pages": [
         "engineering/overview",
         {
-          "group": "架构设计",
-          "pages": [
-            "engineering/architecture/system-design",
-            "engineering/architecture/distributed-systems"
-          ]
-        },
-        {
-          "group": "后端开发",
-          "pages": [
-            "engineering/backend/golang",
-            "engineering/backend/python"
-          ]
-        },
-        {
-          "group": "前端开发",
-          "pages": [
-            "engineering/frontend/react",
-            "engineering/frontend/typescript"
-          ]
-        },
-        {
-          "group": "DevOps",
-          "pages": [
-            "engineering/devops/docker",
-            "engineering/devops/kubernetes",
-            "engineering/devops/ci-cd"
-          ]
-        },
-        {
           "group": "AI & ML",
           "pages": [
-            "engineering/ai/llm",
-            "engineering/ai/prompt-engineering"
+            "engineering/ai/llm-knowledge-management"
           ]
         }
       ]
@@ -110,13 +80,8 @@
         {
           "group": "技术洞察",
           "pages": [
-            "thinking/tech/index"
-          ]
-        },
-        {
-          "group": "生活感悟",
-          "pages": [
-            "thinking/life/index"
+            "thinking/tech/index",
+            "thinking/tech/vibe-coding"
           ]
         }
       ]
